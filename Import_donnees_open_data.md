@@ -409,20 +409,39 @@ psql -d gis -f "cadastre_dvf_schema.sql"
 Dans `psql`
 
 
+```sql
+\dt+ dvf
+--                      List of relations
+--   Schema  | Name | Type  |  Owner  |  Size   | Description 
+-- ----------+------+-------+---------+---------+-------------
+--  cadastre | dvf  | table | romulus | 2567 MB | 
+
+select count(*) from dvf;
+--   count   
+-- ----------
+--  13903117
+-- (1 row)
+
+-- Time: 11453,394 ms (00:11,453)
 ```
-gis=# \dt+ dvf
-                     List of relations
-  Schema  | Name | Type  |  Owner  |  Size   | Description 
-----------+------+-------+---------+---------+-------------
- cadastre | dvf  | table | romulus | 2567 MB | 
 
-gis=# select count(*) from dvf;
-  count   
-----------
- 13903117
-(1 row)
+Puis l'alter table
 
-Time: 11453,394 ms (00:11,453)
+```bash
+psql -d gis -f "cadastre_dvf_alter_table.sql"
+```
+
+C'est quand même long et ça fait doubler temporairement la taille de la BD.
+Mettre bien les UPDATEs avant les index pour éviter de les mettre à jour inutilement.
+
+
+```sql
+\dt+ dvf
+--                      List of relations
+--   Schema  | Name | Type  |  Owner  |  Size   | Description 
+-- ----------+------+-------+---------+---------+-------------
+--  cadastre | dvf  | table | romulus | 3038 MB | 
+-- (1 row)
 ```
 
 Finalisation
