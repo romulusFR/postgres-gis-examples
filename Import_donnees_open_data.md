@@ -436,12 +436,22 @@ Mettre bien les UPDATEs avant les index pour éviter de les mettre à jour inuti
 
 
 ```sql
-\dt+ dvf
---                      List of relations
---   Schema  | Name | Type  |  Owner  |  Size   | Description 
--- ----------+------+-------+---------+---------+-------------
---  cadastre | dvf  | table | romulus | 3038 MB | 
--- (1 row)
+SELECT
+    pg_size_pretty (
+        pg_total_relation_size ('dvf')
+    ),
+    pg_size_pretty (
+        pg_indexes_size ('dvf')
+    ),
+    pg_size_pretty (
+        pg_relation_size ('dvf')
+    )
+;
+
+--  pg_size_pretty | pg_size_pretty | pg_size_pretty 
+-- ----------------+----------------+----------------
+--  5951 MB        | 2912 MB        | 3038 MB
+
 ```
 
 Finalisation
