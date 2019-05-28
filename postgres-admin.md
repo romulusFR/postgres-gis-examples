@@ -85,6 +85,10 @@ SELECT lp, lp_off, lp_len, t_xmin, t_xmax, t_ctid, t_hoff, t_data FROM heap_page
 -- ----+--------+--------+--------+--------+--------+--------+--------------------------------------------------------------------------------
 --   1 |   8128 |     62 |   1707 |      0 | (0,1)  |     24 | \x3a01000043323363653437666237613038356430366261303132353462363131643136323200
 
+-- Une seule page pour les données
+SELECT * FROM pgstattuple('t');
+
+-- On a bien une seule page et une profondeur de 0
 SELECT * FROM bt_metap('t_a_idx');      
 -- -[ RECORD 1 ]-----------+-------
 -- magic                   | 340322
@@ -111,7 +115,7 @@ SELECT * FROM bt_page_stats('t_a_idx', 1);
 -- btpo_flags    | 3
 
 
-SELECT * FROM pgstattuple('t');
+-- une seule page pour l'index (hors la meta page numéro 0)
 SELECT * FROM pgstatindex('t_a_idx');
 
 
@@ -184,6 +188,126 @@ SELECT * FROM page_header(get_raw_page('t', 0));
 -- Avec 12 tuples, on a bien un "free space" entre les octets 
 --  - 72 (24B de header + 12*4B de pointeur) 
 --  - 7424 (qu'on retrouve comme offset lp_off du dernier tuple introduit)
+
+
+-- On interroge la page de l'index
+SELECT itemoffset, ctid FROM bt_page_items('t_a_idx', 1);
+--  itemoffset |  ctid  
+-- ------------+--------
+--           1 | (0,4)
+--           2 | (0,7)
+--           3 | (0,8)
+--           4 | (0,1)
+--           5 | (0,3)
+--           6 | (0,2)
+--           7 | (0,5)
+--           8 | (0,6)
+--           9 | (0,9)
+--          10 | (0,10)
+--          11 | (0,12)
+--          12 | (0,11)
+
+-- on y retrouve bien l'ordre croissant des id de tuples
+select a, n FROM t JOIN (select a, row_number() over() as n  from t) as t2 USING(a) ORDER BY a;
+--   a  | n  
+-- -----+----
+--  111 |  4
+--  153 |  7
+--  231 |  8
+--  314 |  1
+--  399 |  3
+--  400 |  2
+--  427 |  5
+--  431 |  6
+--  523 |  9
+--  610 | 10
+--  813 | 12
+--  844 | 11
+-- (12 rows)
+
+SELECT * FROM bt_page_stats('t_a_idx', 1);
+--  blkno | type | live_items | dead_items | avg_item_size | page_size | free_size | btpo_prev | btpo_next | btpo | btpo_flags 
+-- -------+------+------------+------------+---------------+-----------+-----------+-----------+-----------+------+------------
+--      1 | l    |         12 |          0 |            16 |      8192 |      7908 |         0 |         0 |    0 |          3
+
+
+-- une entrée de feuille a une taille de 16B, +4B pour le pointeur en début de page ?
+-- le header dune page bttree fait 44 = 24B (pour une page) + 20B = 5fields * 4B de la partie opaque (BTPageOpaqueData) ajoutée en fin ?
+-- https://github.com/postgres/postgres/blob/master/src/backend/access/nbtree/README
+-- https://github.com/postgres/postgres/blob/master/src/include/access/nbtree.h
+-- https://github.com/postgres/postgres/blob/master/src/backend/access/nbtree/nbtpage.c
+
+
+-- ATTENTION : quand on modifie les données après un DELETE, les pointeurs d'index "restent" jusqu'au vacuum car les tuples sont là dans le HEAP, mais invisible pour la transaction
+-- TODO EXAMPLE
+
+-- On recommence
+
+DROP TABLE t;
+CREATE table t(a integer, b text, c boolean);
+CREATE index on t(a);
+
+INSERT INTO t(a,b,c)
+SELECT s.id, md5((random()*1000)::text), random() < 0.5
+FROM generate_series(1,407) as s(id)
+ORDER BY random()
+ON CONFLICT DO NOTHING;
+-- INSERT 0 407
+ANALYZE t;
+
+
+SELECT * FROM bt_metap('t_a_idx');
+--  magic  | version | root | level | fastroot | fastlevel | oldest_xact | last_cleanup_num_tuples 
+-- --------+---------+------+-------+----------+-----------+-------------+-------------------------
+--  340322 |       3 |    1 |     0 |        1 |         0 |           0 |                      -1
+
+
+SELECT * FROM bt_page_stats('t_a_idx', 1);
+--  blkno | type | live_items | dead_items | avg_item_size | page_size | free_size | btpo_prev | btpo_next | btpo | btpo_flags 
+-- -------+------+------------+------------+---------------+-----------+-----------+-----------+-----------+------+------------
+--      1 | l    |        407 |          0 |            16 |      8192 |         8 |         0 |         0 |    0 |          3
+
+-- On est sur le point de déborder
+
+
+INSERT INTO t VALUES(407, md5((random()*1000)::text), random() < 0.5) ON CONFLICT DO NOTHING;
+SELECT * FROM bt_metap('t_a_idx');
+--  magic  | version | root | level | fastroot | fastlevel | oldest_xact | last_cleanup_num_tuples 
+-- --------+---------+------+-------+----------+-----------+-------------+-------------------------
+--  340322 |       3 |    3 |     1 |        3 |         1 |           0 |                      -1
+
+-- On voit 
+  -- * qu'on a créée une racine (page #3)
+  -- * que la page #1 a été rééquilibré à 90% de remplissage (BTREE_DEFAULT_FILLFACTOR dans nbtree.h) 367/408 = 0.8995
+  -- * qu'elle pointe vers (btpo_next) la page #2
+  
+
+
+SELECT * FROM bt_page_stats('t_a_idx', 3);
+--  blkno | type | live_items | dead_items | avg_item_size | page_size | free_size | btpo_prev | btpo_next | btpo | btpo_flags 
+-- -------+------+------------+------------+---------------+-----------+-----------+-----------+-----------+------+------------
+--      3 | r    |          2 |          0 |            12 |      8192 |      8116 |         0 |         0 |    1 |          2
+
+SELECT * FROM bt_page_items('t_a_idx', 3);
+--  itemoffset |  ctid  | itemlen | nulls | vars |          data           
+-- ------------+--------+---------+-------+------+-------------------------
+--           1 | (1,0)  |       8 | f     | f    | 
+--           2 | (2,21) |      16 | f     | f    | 6f 01 00 00 00 00 00 00
+
+-- https://www.postgresql.org/docs/current/pageinspect.html
+-- In a B-tree leaf page, ctid points to a heap tuple. In an internal page, the block number part of ctid points to another page in the index itself, while the offset part (the second number) is ignored and is usually 1.
+
+
+SELECT * FROM bt_page_stats('t_a_idx', 1);
+ blkno | type | live_items | dead_items | avg_item_size | page_size | free_size | btpo_prev | btpo_next | btpo | btpo_flags 
+-------+------+------------+------------+---------------+-----------+-----------+-----------+-----------+------+------------
+     1 | l    |        367 |          0 |            16 |      8192 |       808 |         0 |         2 |    0 |          1
+
+
+SELECT * FROM bt_page_stats('t_a_idx', 2);
+ blkno | type | live_items | dead_items | avg_item_size | page_size | free_size | btpo_prev | btpo_next | btpo | btpo_flags 
+-------+------+------------+------------+---------------+-----------+-----------+-----------+-----------+------+------------
+     2 | l    |         42 |          0 |            16 |      8192 |      7308 |         1 |         0 |    0 |          1
 
 ```
 
