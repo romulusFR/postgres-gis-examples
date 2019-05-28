@@ -12,24 +12,24 @@ Docs générales
 * Fonctionnement de postgres <http://www.interdb.jp/pg/>
 * SQL moderne <https://modern-sql.com/>
 
-Indexation et représentation physique
--------------------------------------
+Indexation et représentation physique des pages
+-----------------------------------------------
 
-
-* Extension "debug" <https://www.postgresql.org/docs/current/pageinspect.html>
-* Série de 8 posts : <https://habr.com/en/company/postgrespro/blog/441962/>
 * <http://use-the-index-luke.com/>
-* Série de pôsts dont la structure interce des BTrees <http://www.louisemeta.com/blog/>, voir son outil <https://github.com/louiseGrandjonc/pageinspect_inspector> poru représenter graphiquement les pages des index
+* Extension pour accéder aux pages <https://www.postgresql.org/docs/current/pageinspect.html>
+* Série de 8 posts : <https://habr.com/en/company/postgrespro/blog/441962/>
+* Série de posts dont la structure interce des BTrees <http://www.louisemeta.com/blog/>, voir son outil <https://github.com/louiseGrandjonc/pageinspect_inspector> poru représenter graphiquement les pages des index
+* <https://www.8kdata.com/blog/postgresql-page-layout/> : super illustrations
 
-
-### Tutoriel
 
 On reprend la table <https://habr.com/en/company/postgrespro/blog/441962/>
 
 ```sql
--- Après avoir crée l'extension et donné les droits
+-- Après avoir crée les extensions et donné les droits
+-- CREATE EXTENSION pgstattuple;
 -- CREATE EXTENSION pgstattuple;
 -- GRANT pg_stat_scan_tables TO romulus;
+
 CREATE table t(a integer, b text, c boolean);
 CREATE index on t(a);
 ANALYZE t;
@@ -221,8 +221,8 @@ PoWA (PostgreSQL Workload Analyzer) is a performance tool for PostgreSQL 9.4 and
 
 <https://powa.readthedocs.io/en/latest/>
 
-Paramètres à tuner
-------------------
+Tuning de configuration
+-----------------------
 
 * <https://www.postgresql.org/docs/current/runtime-config-resource.html>
 * <https://pgtune.leopard.in.ua/#/>
