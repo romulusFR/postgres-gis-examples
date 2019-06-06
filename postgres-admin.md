@@ -12,15 +12,15 @@ Docs générales
 * Fonctionnement de postgres <http://www.interdb.jp/pg/>
 * SQL moderne <https://modern-sql.com/>
 
-Indexation et représentation physique des pages
------------------------------------------------
+Représentation physique des pages (tables et index)
+---------------------------------------------------
 
-* <http://use-the-index-luke.com/>
+
 * Extension pour accéder aux pages <https://www.postgresql.org/docs/current/pageinspect.html>
 * Série de 8 posts : <https://habr.com/en/company/postgrespro/blog/441962/>
 * Série de posts dont la structure interce des BTrees <http://www.louisemeta.com/blog/>, voir son outil <https://github.com/louiseGrandjonc/pageinspect_inspector> poru représenter graphiquement les pages des index
 * <https://www.8kdata.com/blog/postgresql-page-layout/> : super illustrations
-
+* 3 posts bien root (assez proche de la suite en fait) <https://fritshoogland.wordpress.com/2017/07/01/postgresql-block-internals/>
 
 On reprend la table <https://habr.com/en/company/postgrespro/blog/441962/>
 
@@ -70,6 +70,8 @@ select * from t;
 --   a  |                b                 | c 
 -- -----+----------------------------------+---
 --  314 | 23ce47fb7a085d06ba01254b611d1622 | f
+
+-- psql -d romulus -tA -c "select encode(get_raw_page::bytea, 'hex') from get_raw_page('t',0)" | xxd -p -r | od -A d -t x1
 
 
 SELECT * FROM page_header(get_raw_page('t', 0));
@@ -278,9 +280,8 @@ SELECT * FROM bt_metap('t_a_idx');
 
 -- On voit 
   -- * qu'on a créée une racine (page #3)
-  -- * que la page #1 a été rééquilibré à 90% de remplissage (BTREE_DEFAULT_FILLFACTOR dans nbtree.h) 367/408 = 0.8995
+  -- * que la page #1 a été rééquilibré à 90% de remplissage car c'est une page la plus à gauche (BTREE_DEFAULT_FILLFACTOR dans nbtree.h) 367/408 = 0.8995
   -- * qu'elle pointe vers (btpo_next) la page #2
-  
 
 
 SELECT * FROM bt_page_stats('t_a_idx', 3);
@@ -309,8 +310,18 @@ SELECT * FROM bt_page_stats('t_a_idx', 2);
 -------+------+------------+------------+---------------+-----------+-----------+-----------+-----------+------+------------
      2 | l    |         42 |          0 |            16 |      8192 |      7308 |         1 |         0 |    0 |          1
 
+
+INSERT INTO t(a,b,c)
+SELECT random()*65535, md5((random()*65535)::text), random() < 0.5
+FROM generate_series(1,65535) as s(id)
+ORDER BY random()
+ON CONFLICT DO NOTHING;
 ```
 
+Performances et indexation
+--------------------------
+
+* <http://use-the-index-luke.com/>
 
 Monitoring
 ----------
@@ -351,6 +362,7 @@ Tuning de configuration
 * <https://www.postgresql.org/docs/current/runtime-config-resource.html>
 * <https://pgtune.leopard.in.ua/#/>
 * <http://pgconfigurator.cybertec.at/>
+* <https://github.com/jfcoz/postgresqltuner>
 
 
 ### Synchro
@@ -380,3 +392,9 @@ _TimescaleDB is an open-source database designed to make SQL scalable for time-s
 * <https://docs.timescale.com/v1.3/getting-started/installation/ubuntu/installation-apt-ubuntu>
 * <https://github.com/timescale/timescaledb-tune>
 * Utilisable comme datasource pour Grafana <https://grafana.com/docs/features/datasources/postgres/>
+
+
+Misc
+----
+
+* Mass loader <https://github.com/dimitri/pgloader> (au dessus de \copy COPY )
