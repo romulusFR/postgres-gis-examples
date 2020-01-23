@@ -18,3 +18,9 @@ ogr2ogr -progress -f "PostgreSQL" PG:"dbname='$DB' port='$PORT' user='$USER' hos
 
 ogr2ogr -progress -f "PostgreSQL" PG:"dbname='$DB' port='$PORT' user='$USER' host='$HOST' password='$PWD'" -nln $SCHEMA.presidentielle2  $DIR/elections_presidentielle_tour_2.json
 
+ogr2ogr -progress -f "PostgreSQL" PG:"dbname='$DB' port='$PORT' user='$USER' host='$HOST' password='$PWD'" -nln $SCHEMA.municipales_nuances  $DIR/municipales-2014-codes-nuances-listes.json
+
+ogr2ogr -progress -f "PostgreSQL" PG:"dbname='$DB' port='$PORT' user='$USER' host='$HOST' password='$PWD'" -nln $SCHEMA.municipales_elus  $DIR/municipaux-2014-les-elus.json
+
+ogr2ogr -progress -f "PostgreSQL" PG:"dbname='$DB' port='$PORT' user='$USER' host='$HOST' password='$PWD'" -nln $SCHEMA.municipales  $DIR/municipales-2014-resultats-des-elections.json
+
